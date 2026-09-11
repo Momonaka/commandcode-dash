@@ -20,9 +20,9 @@ const live = fixture('catalog').data.map((model) => ({
 }))
 
 const mod = await loadClientBundle({ react: createRenderer().react })
-const { mergeModels, belongsOnRoute } = mod.__internals
-if (mergeModels === undefined) {
-  console.log('FAIL  the bundle no longer exports __internals.mergeModels')
+const { mergeModels, belongsOnRoute, buildProviderRoutes } = mod.__internals
+if (mergeModels === undefined || buildProviderRoutes === undefined) {
+  console.log('FAIL  the bundle no longer exports __internals.mergeModels / buildProviderRoutes')
   process.exit(1)
 }
 
@@ -78,27 +78,52 @@ const anthropic = mergeModels('commandcode-anthropic', live, [])
 check.same('the Anthropic route takes only claude', anthropic.added, ['claude-opus-5'])
 check.same('the Anthropic route does not take non-claude', anthropic.added.filter((id) => !id.startsWith('claude-')), [])
 
+// --- automatic provider provisioning -------------------------------------
+// A fresh install has no Command Code route at all, so the plugin builds them
+// from the live catalog. These assertions pin that shape.
+const built = buildProviderRoutes(live)
+console.log('  provisioned routes')
+check.same('both routes are built from the catalog', Object.keys(built).sort(), ['commandcode', 'commandcode-anthropic'])
+check.same('the OpenAI route speaks chat completions', built.commandcode.api, 'openai-completions')
+check.same('the Claude route speaks the Anthropic protocol', built['commandcode-anthropic'].api, 'anthropic-messages')
+check.same('both routes share the Provider endpoint', [built.commandcode.baseURL, built['commandcode-anthropic'].baseURL], [
+  'https://api.commandcode.ai/provider/v1',
+  'https://api.commandcode.ai/provider/v1',
+])
+check.same('both routes reference the same credential', [built.commandcode.apiKeyEnv, built['commandcode-anthropic'].apiKeyEnv], [
+  'COMMANDCODE_API_KEY',
+  'COMMANDCODE_API_KEY',
+])
+check.ok('the OpenAI route is non-empty', built.commandcode.models.length > 0)
+check.ok('the Claude route is non-empty', built['commandcode-anthropic'].models.length > 0)
+check.same('no claude id lands on the OpenAI route', built.commandcode.models.filter((m) => m.id.startsWith('claude-')), [])
+check.same('only claude ids land on the Claude route', built['commandcode-anthropic'].models.filter((m) => !m.id.startsWith('claude-')).length, 0)
+check.ok('every provisioned model carries a context window', built.commandcode.models.every((m) => typeof m.contextWindow === 'number'))
+check.same('provisioned models declare no modality', built.commandcode.models.filter((m) => m.input !== undefined).length, 0)
+check.same('only the completions route sets the usage switch', [Boolean(built.commandcode.compat), Boolean(built['commandcode-anthropic'].compat)], [true, false])
+
 // --- optional: the real llm-pi-ai schema ---------------------------------
 const packages = process.env.DSH_PACKAGES
 if (packages === undefined || packages === '') {
   console.log('  SKIP  llm-pi-ai schema check (set DSH_PACKAGES to a DSH @deepseek-ai directory)')
 } else {
   const { Config } = await import(`${packages}/dsh-llm-pi-ai/lib/index.js`)
-  const candidate = {
-    providers: {
-      commandcode: {
-        api: 'openai-completions',
-        baseURL: 'https://api.commandcode.ai/provider/v1',
-        apiKeyEnv: 'COMMANDCODE_API_KEY',
-        models: openai.next,
-      },
-    },
-  }
+  const candidate = { providers: { commandcode: { ...built.commandcode, models: openai.next } } }
   try {
     const value = Config(candidate)
     check.ok(`the merged list passes the real llm-pi-ai schema (${String(value.providers.commandcode.models.length)} models)`, true)
   } catch (error) {
     check.ok(`the merged list passes the real llm-pi-ai schema — ${error.message}`, false)
+  }
+  // The provisioned shape itself must be accepted, untouched.
+  try {
+    const value = Config({ providers: built })
+    check.ok(
+      `the provisioned routes pass the real llm-pi-ai schema (${String(value.providers.commandcode.models.length)} + ${String(value.providers['commandcode-anthropic'].models.length)} models)`,
+      true,
+    )
+  } catch (error) {
+    check.ok(`the provisioned routes pass the real llm-pi-ai schema — ${error.message}`, false)
   }
 }
 

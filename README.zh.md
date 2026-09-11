@@ -116,6 +116,20 @@ refs:
 
 它在主机侧按请求解析，因此保存后下次刷新即生效，无需重启。
 
+### 模型提供方
+
+填好 key 就是全部配置。校验通过后，该分区会自己把 `llm-pi-ai` 的路由建好，模型表
+取自 `provider/v1/models`：
+
+| 路由 | 协议 | 模型 |
+|---|---|---|
+| `commandcode` | `openai-completions` | 除 Claude 外的全部模型 |
+| `commandcode-anthropic` | `anthropic-messages` | Claude —— Command Code 只在 `/messages` 上提供它们 |
+
+已存在的路由**绝不会被覆盖**，所以手工调过的条目（包括逐模型的
+`input: [text, image]` 声明）在升级后依然保留。新装进来的模型一律声明为纯文本，
+因为目录接口不返回模态信息；需要的话到「设置 → 模型」手工补上。
+
 ## 免责声明
 
 这是一个**非官方、社区构建**的插件。它与 DeepSeek 及 Command Code 均无隶属、

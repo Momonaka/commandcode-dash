@@ -40,9 +40,24 @@ globalThis.fetch = async (url) => {
 
 const renderer = createRenderer()
 const mod = await loadClientBundle({ react: renderer.react })
+// `fresh` models a machine where the plugin was just installed and nothing has
+// been written to llm-pi-ai yet — the case that used to leave the user with no
+// models at all. `write-fails` starts from the same empty state.
+const configuredProviders =
+  scenario === 'fresh' || scenario === 'write-fails'
+    ? {}
+    : {
+        commandcode: { displayName: 'Command Code', models: configured },
+        // In sync with the catalog, so the run has exactly one thing to report.
+        'commandcode-anthropic': {
+          displayName: 'Command Code (Claude)',
+          models: [{ id: 'claude-opus-5', name: 'Claude Opus 5', contextWindow: 1000000 }],
+        },
+      }
 const mounted = mountClient(mod, {
-  section: { providers: { commandcode: { displayName: 'Command Code', models: configured } } },
+  section: { providers: configuredProviders },
   revision: 3,
+  writeFails: scenario === 'write-fails',
 })
 
 console.log(`render (${scenario})`)
@@ -62,7 +77,12 @@ const tree = await renderer.render(Section, {})
 const view = renderer.walk(tree)
 const [accountResponse, modelsResponse] = [fetched[0], fetched[1]]
 
-if (scenario === 'ok') {
+const hasPanel = scenario === 'ok' || scenario === 'fresh' || scenario === 'write-fails'
+const rows = view.byClass['ccx-row'] ?? 0
+const claudeRows = view.texts.filter((t) => t.startsWith('claude-'))
+const nonClaudeLive = catalog.filter((model) => !model.id.startsWith('claude-')).length
+
+if (hasPanel) {
   check.same('both routes are fetched', [accountResponse, modelsResponse], [
     '/api/commandcode/account',
     '/api/commandcode/models',
@@ -75,19 +95,52 @@ if (scenario === 'ok') {
   check.ok('the billing-period section is rendered', view.texts.includes('This billing period'))
   check.ok('a reset countdown is rendered', view.texts.some((t) => t.includes('resets in') || t.includes('reset pending')))
   check.ok('the model panel is rendered', view.texts.includes('Models'))
-
-  // The table must list every merged model — 4 configured plus 1 addition.
-  const rows = view.byClass['ccx-row'] ?? 0
-  check.same('every model is rendered, with no truncation', rows, configured.length + 1)
   check.same('no "more" placeholder remains', view.byClass['ccx-more'] ?? 0, 0)
+}
+
+// --- automatic provider provisioning -------------------------------------
+if (scenario === 'ok') {
+  // Four configured OpenAI-route entries, one catalog addition, and the
+  // in-sync Claude entry.
+  check.same('every model is rendered, with no truncation', rows, configured.length + 1 + 1)
   check.ok('the newly added model is listed', view.texts.includes('moonshotai/Kimi-K3'))
   check.ok('a dropped model is still listed', view.texts.includes('xai/grok-4.5'))
   check.ok('a vision entry shows its modality', view.texts.some((t) => t.includes('vision')))
   check.ok('a diff summary is offered', view.texts.some((t) => t.includes('Apply')))
-  check.same('no claude id reaches the OpenAI-compatible table', view.texts.filter((t) => t.startsWith('claude-')), [])
+  check.same('claude is listed only once, on the Anthropic route', claudeRows, ['claude-opus-5'])
+  check.same('an already-configured install is never overwritten', mounted.writes.length, 0)
+} else if (scenario === 'fresh') {
+  check.same('a fresh install provisions exactly once', mounted.writes.length, 1)
+  const ops = (mounted.writes[0] && mounted.writes[0].ops) || []
+  check.same(
+    'it writes both provider routes, atomically',
+    ops.map((op) => `${op.op} ${op.path.join('.')}`).sort(),
+    ['set providers.commandcode', 'set providers.commandcode-anthropic'],
+  )
+  check.same('the write is fenced by the namespace revision', mounted.writes[0] && mounted.writes[0].revision, 3)
+  const openai = ops.find((op) => op.path[1] === 'commandcode')
+  const anthro = ops.find((op) => op.path[1] === 'commandcode-anthropic')
+  check.same('the OpenAI route declares its protocol and endpoint', [openai.value.api, openai.value.baseURL], [
+    'openai-completions',
+    'https://api.commandcode.ai/provider/v1',
+  ])
+  check.same('the Claude route declares the Anthropic protocol', anthro.value.api, 'anthropic-messages')
+  check.ok('the OpenAI route ships a non-empty model list', openai.value.models.length > 0)
+  check.ok('the Claude route ships only claude models', anthro.value.models.every((m) => m.id.startsWith('claude-')))
+  check.ok('the success is reported to the user', view.texts.some((t) => t.includes('Added the model provider')))
+  // The whole point: once provisioned, the models are actually there.
+  check.same('the model table appears after provisioning', rows, nonClaudeLive + 1)
+  check.same('claude is listed only once', claudeRows, ['claude-opus-5'])
+  check.ok('the provisioned catalog reports itself in sync', view.texts.some((t) => t.includes('in sync')))
+} else if (scenario === 'write-fails') {
+  check.same('a refused write is attempted once, not retried forever', mounted.writes.length, 1)
+  check.ok('the failure is surfaced instead of passing silently', view.texts.some((t) => t.includes('Could not add the model provider')))
+  check.ok('a retry action is offered', view.texts.includes('Try again'))
+  check.same('the table stays empty when the write was refused', rows, 0)
 } else {
-  check.same('no model table is rendered', view.byClass['ccx-row'] ?? 0, 0)
+  check.same('no model table is rendered', rows, 0)
   check.same('the models route is not fetched without a usable key', fetched.length, 1)
+  check.same('nothing is provisioned without a working key', mounted.writes.length, 0)
   check.ok('no CLI hint leaks into the panel', !view.texts.join(' ').toLowerCase().includes('cmd cli'))
   if (scenario === 'no-key') {
     check.ok('the setup card asks for a key', view.inputs.includes('user_…'))

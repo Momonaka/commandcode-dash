@@ -122,6 +122,22 @@ refs:
 It is resolved host-side once per request, so saving one takes effect on the next
 refresh — no restart.
 
+### The model provider
+
+Saving the key is the whole setup. Once it checks out, the section adds the
+`llm-pi-ai` provider routes itself, using the catalog fetched from
+`provider/v1/models`:
+
+| Route | Protocol | Models |
+|---|---|---|
+| `commandcode` | `openai-completions` | everything except Claude |
+| `commandcode-anthropic` | `anthropic-messages` | Claude, which Command Code only serves over `/messages` |
+
+A route that already exists is never overwritten, so hand-tuned entries — including
+per-model `input: [text, image]` declarations — survive an upgrade. Newly
+provisioned models are declared text-only, because the catalog does not report
+modalities; add them by hand in **Settings → Models** if you need them.
+
 ## Disclaimer
 
 This is an **unofficial, community-built** plugin. It is not affiliated with,

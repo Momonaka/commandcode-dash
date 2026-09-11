@@ -67,6 +67,13 @@ export function mountClient(mod, options = {}) {
     observe() {}
     disconnect() {}
   }
+  const writes = []
+  // The fake scope folds writes back into its snapshot and notifies subscribers,
+  // the way the real settings service does — otherwise a test could never see
+  // the panel react to its own provisioning write.
+  let sectionValue = options.section ?? {}
+  let sectionRevision = options.revision ?? 1
+  const listeners = []
   const ctx = {
     get: (service) =>
       service === 'settingsScope'
@@ -76,11 +83,37 @@ export function mountClient(mod, options = {}) {
               return {
                 getSnapshot: () => ({
                   status: 'ready',
-                  value: options.section ?? {},
-                  revision: options.revision ?? 1,
+                  // A fresh object per read, like the real mirror: the contract is
+                  // "stable reference until the next change", so a change must
+                  // produce a new identity or identity-keyed consumers go stale.
+                  value: structuredClone(sectionValue),
+                  revision: sectionRevision,
                   writable: options.writable ?? true,
                 }),
-                subscribe: () => () => {},
+                subscribe: (fn) => {
+                  listeners.push(fn)
+                  return () => {
+                    const at = listeners.indexOf(fn)
+                    if (at >= 0) listeners.splice(at, 1)
+                  }
+                },
+                // Records every auto-provisioning attempt so a test can assert it.
+                mutate: (ops, revision) => {
+                  writes.push({ ops, revision })
+                  if (options.writeFails === true) return Promise.reject(new Error('settings refused the write'))
+                  for (const op of ops) {
+                    if (op.op !== 'set') continue
+                    let node = sectionValue
+                    for (const key of op.path.slice(0, -1)) {
+                      if (typeof node[key] !== 'object' || node[key] === null) node[key] = {}
+                      node = node[key]
+                    }
+                    node[op.path[op.path.length - 1]] = op.value
+                  }
+                  sectionRevision += 1
+                  for (const fn of [...listeners]) fn()
+                  return Promise.resolve()
+                },
               }
             },
           }
@@ -105,6 +138,7 @@ export function mountClient(mod, options = {}) {
     section: registered.length === 1 ? registered[0].component : undefined,
     registrations: registered,
     binds,
+    writes,
     styleBytes: head[0] ? String(head[0].textContent).length : 0,
     ctx,
     head,
