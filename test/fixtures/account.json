@@ -1,0 +1,42 @@
+{
+  "ok": true,
+  "fetchedAt": 0,
+  "account": {
+    "name": "Ada Lovelace",
+    "userName": "ada",
+    "email": "ada@example.com",
+    "org": null
+  },
+  "plan": {
+    "planId": "individual-goat",
+    "planName": "GOAT",
+    "totalCredits": 70,
+    "status": "active",
+    "currentPeriodStart": "2026-09-10T13:38:20.000Z",
+    "currentPeriodEnd": "2026-10-10T13:38:20.000Z",
+    "cancelAtPeriodEnd": false
+  },
+  "credits": {
+    "monthlyCredits": 68.462753912,
+    "purchasedCredits": 0,
+    "freeCredits": 0,
+    "creditThreshold": 0,
+    "belowThreshold": false
+  },
+  "windowLimits": {
+    "limited": true,
+    "exceeded": null,
+    "fiveHour": { "used": 0.017418702, "cap": 14, "exceeded": false, "resetAt": 4102444800000 },
+    "weekly": { "used": 1.537246088, "cap": 35, "exceeded": false, "resetAt": 4102444800000 }
+  },
+  "period": {
+    "totalCount": 580,
+    "totalCost": 1.596058052,
+    "totalCredits": 1.596058052,
+    "totalTokensIn": 76164407,
+    "totalTokensOut": 411145,
+    "totalTokens": 76575552,
+    "successRate": 100,
+    "periodBasis": "billing-period"
+  }
+}

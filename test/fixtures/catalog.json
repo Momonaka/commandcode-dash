@@ -1,0 +1,40 @@
+{
+  "object": "list",
+  "data": [
+    {
+      "id": "deepseek/deepseek-v4-flash",
+      "object": "model",
+      "owned_by": "command-code",
+      "name": "DeepSeek V4 Flash (latest)",
+      "context_length": 1000000
+    },
+    {
+      "id": "google/gemini-3.7-flash",
+      "object": "model",
+      "owned_by": "command-code",
+      "name": "Gemini 3.7 Flash",
+      "context_length": 1048576
+    },
+    {
+      "id": "gpt-5.5",
+      "object": "model",
+      "owned_by": "command-code",
+      "name": "GPT-5.5",
+      "context_length": 400000
+    },
+    {
+      "id": "claude-opus-5",
+      "object": "model",
+      "owned_by": "command-code",
+      "name": "Claude Opus 5",
+      "context_length": 1000000
+    },
+    {
+      "id": "moonshotai/Kimi-K3",
+      "object": "model",
+      "owned_by": "command-code",
+      "name": "Kimi K3",
+      "context_length": 1000000
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+# Dependencies — this plugin has none, but a local install may create one.
+node_modules/
+
+# macOS
+.DS_Store
+
+# Logs and scratch output
+*.log

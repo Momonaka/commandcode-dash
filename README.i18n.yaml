@@ -1,0 +1,10 @@
+# Bilingual-pair consistency record, same shape as the DSH monorepo's package
+# READMEs: the git blob hash of each side as of the last confirmed-consistent
+# state. Both languages carry equal authority; after editing either side, bring
+# the other along and re-record with:
+#   git hash-object README.md README.zh.md
+# (The monorepo's `verify-translation-pairing` script lives with that workspace
+# and does not travel with this out-of-tree plugin, so the hashes are recorded
+# by hand here.)
+README.md: 7423f276478ac4fdf7baa071d3b8464a013e315b
+README.zh.md: ccfc226d198db175bfdf99596c1d5ab36e9b64c5
