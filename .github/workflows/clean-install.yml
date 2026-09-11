@@ -2,8 +2,8 @@ name: Clean install
 
 # The end-to-end check for a machine that has never seen this plugin: a pristine
 # GitHub runner installs the harness from npm, installs the plugin from GitHub by
-# the published command, mounts it, boots the web profile, and exercises the
-# plugin's routes over the authenticated API.
+# the published command — which mounts itself, as a bundle — boots the web
+# profile, and exercises the plugin's routes over the authenticated API.
 on:
   push:
     branches: [main]
@@ -55,14 +55,22 @@ jobs:
           dsh plugin --profile web add "github:${{ github.repository }}"
           test -e "$DSH_HOME/profiles/web/node_modules/commandcode-dash/package.json"
 
-      - name: Mount it in the profile patch layer
+      - name: Confirm the bundle mounted itself
         run: |
-          # The shipped file is `[]`; it must be replaced, not appended to.
-          cat > "$DSH_HOME/profiles/web/cordis.patch.yml" <<'YAML'
-          - insert:
-              - id: commandcode
-                name: commandcode-dash
-          YAML
+          # The package declares dsh.bundle, so the install reconciles it into
+          # dsh.profile.bundles and no manual patch entry is needed. A manual one
+          # would be a second row with id commandcode, i.e. a duplicate loader
+          # entry id, which fails the boot — so the user layer must stay empty.
+          grep -q '^\[\]$' "$DSH_HOME/profiles/web/cordis.patch.yml" \
+            || { echo 'the user patch layer must stay empty'; exit 1; }
+          node -e '
+            const manifest = require(process.env.DSH_HOME + "/profiles/web/package.json");
+            const bundles = manifest.dsh.profile.bundles;
+            if (!bundles.includes("commandcode-dash")) {
+              console.error("commandcode-dash missing from dsh.profile.bundles:", bundles);
+              process.exit(1);
+            }
+          '
           dsh --profile web --dump-config | grep -A1 'id: commandcode'
 
       - name: Boot the web profile and exercise the plugin

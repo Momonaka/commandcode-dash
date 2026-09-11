@@ -75,29 +75,22 @@ Works without publishing anything, but pnpm pins the resolved commit in the
 profile lockfile, so this path needs the explicit update step below to move
 forward. It also cannot be used from a registry mirror that has not synced.
 
-Either way, the install prints a `declares no dsh.bundle` warning. That is
-expected: the plugin is mounted by the patch entry below rather than as a profile
-layer.
-
 ### From a local checkout
 
 ```sh
-git clone https://github.com/Momonaka/commandcode-dash ~/dsh-plugins/commandcode-dash
-mkdir -p "${DSH_HOME:-$HOME/.dsh}/profiles/web/node_modules"
-ln -sfn ~/dsh-plugins/commandcode-dash \
-        "${DSH_HOME:-$HOME/.dsh}/profiles/web/node_modules/commandcode-dash"
+dsh plugin --profile web add "link:$HOME/dsh-plugins/commandcode-dash"
 ```
 
-The symlink is enough because the host half imports **nothing** — no
-`@deepseek-ai/*` specifier has to resolve from the profile's own
-`node_modules`, so the package works without a real install step.
+`link:` keeps the profile pointed at the checkout itself, so an edit there is
+what the next boot loads — no reinstall per change. The host half imports
+**nothing** from `@deepseek-ai/*`, so the checkout needs no build and no install
+step of its own.
 
-### Mount the plugin
+### It mounts itself
 
-The profile's patch layer ships as an empty array containing `[]`. **Replace that
-`[]`** with the entry below — leaving it in place and appending produces invalid
-YAML and the profile refuses to boot. The file lives at
-`${DSH_HOME:-$HOME/.dsh}/profiles/web/cordis.patch.yml`:
+`commandcode-dash` is a DSH **bundle**: `package.json` declares
+`dsh.bundle.patch`, and the patch file it names contributes the profile row
+below.
 
 ```yaml
 - insert:
@@ -105,18 +98,43 @@ YAML and the profile refuses to boot. The file lives at
       name: commandcode-dash
 ```
 
-Then restart the web profile:
+`dsh plugin add` (and `update`) reconciles the installed state, finds that
+declaration, and appends the package to the profile's `dsh.profile.bundles` list
+— so the only step left after installing is a restart:
 
 ```sh
 dsh --profile web
 ```
 
+No edit to `cordis.patch.yml` is involved, and none should be made for this: a
+second row with the id `commandcode` is a duplicate loader entry id, which fails
+the boot. That file is applied *after* every bundle layer, so it remains the
+place to opt out or retune:
+
+```yaml
+- id: commandcode
+  disabled: true
+```
+
 ### Verify
 
-`commandcode` should appear at the end of the composed tree:
+`commandcode` should appear at the end of the composed tree, with the profile
+patch layer untouched:
 
 ```sh
 dsh --profile web --dump-config | grep -A1 commandcode
+```
+
+### Upgrading from 0.1.0
+
+0.1.0 was not a bundle and had to be mounted by hand, with the `insert` row
+above pasted into the profile's `cordis.patch.yml`. That row and the bundle's own
+insert are two entries sharing the id `commandcode`, which fails the boot. When
+you update to 0.1.1 or later, reset that file to the empty array the profile
+template ships with:
+
+```yaml
+[]
 ```
 
 ### Updating

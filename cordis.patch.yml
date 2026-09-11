@@ -1,0 +1,16 @@
+# The commandcode-dash bundle patch: one insert over the profile root, mounting
+# the host half. The host half's activation is what pulls the browser half into
+# the boot graph, through the `dsh.client` declaration in package.json.
+#
+# Because it is a bundle, `dsh plugin --profile <name> add commandcode-dash`
+# appends this package to `dsh.profile.bundles` on install and the row below
+# mounts on the next boot — no manual patch entry. A profile's own
+# cordis.patch.yml is applied after every bundle layer, so it stays the place to
+# opt out or retune:
+#
+#   - id: commandcode
+#     disabled: true
+
+- insert:
+    - id: commandcode
+      name: commandcode-dash

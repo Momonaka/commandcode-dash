@@ -71,27 +71,20 @@ dsh plugin --profile web add github:Momonaka/commandcode-dash
 不需要发布任何东西，但 pnpm 会把解析到的提交钉在 profile 的锁文件里，所以这条路
 必须靠下方的显式更新步骤才能前进；对于尚未同步的镜像源也无法使用。
 
-两种方式安装时都会打印一条 `declares no dsh.bundle` 警告。这是预期行为：本插件是
-通过下方的 patch 条目挂载的，而不是作为 profile 层。
-
 ### 从本地检出安装
 
 ```sh
-git clone https://github.com/Momonaka/commandcode-dash ~/dsh-plugins/commandcode-dash
-mkdir -p "${DSH_HOME:-$HOME/.dsh}/profiles/web/node_modules"
-ln -sfn ~/dsh-plugins/commandcode-dash \
-        "${DSH_HOME:-$HOME/.dsh}/profiles/web/node_modules/commandcode-dash"
+dsh plugin --profile web add "link:$HOME/dsh-plugins/commandcode-dash"
 ```
 
-一个软链就够了，因为主机半**零 import** —— 不需要从 profile 自己的
-`node_modules` 解析任何 `@deepseek-ai/*` 说明符，所以该包无需真正的安装步骤
-即可工作。
+`link:` 让 profile 直接指向检出目录，因此下一次启动加载的就是你改过的代码，无需每次
+改动都重装。主机半**零 import** —— 不需要解析任何 `@deepseek-ai/*` 说明符，所以检出
+目录本身不需要构建，也不需要单独的安装步骤。
 
-### 挂载插件
+### 自动挂载
 
-profile 的 patch 层初始内容是一个空数组 `[]`。请**把那个 `[]` 替换掉**，而不是在
-它后面追加 —— 否则会产生非法 YAML，profile 将拒绝启动。文件位于
-`${DSH_HOME:-$HOME/.dsh}/profiles/web/cordis.patch.yml`：
+`commandcode-dash` 是一个 DSH **bundle**：`package.json` 里声明了
+`dsh.bundle.patch`，它指向的 patch 文件贡献了下面这一行：
 
 ```yaml
 - insert:
@@ -99,18 +92,38 @@ profile 的 patch 层初始内容是一个空数组 `[]`。请**把那个 `[]` �
       name: commandcode-dash
 ```
 
-然后重启 web profile：
+`dsh plugin add`（以及 `update`）会按安装后的真实状态对账，发现该声明后把包追加进
+profile 的 `dsh.profile.bundles`，所以安装完只剩重启这一步：
 
 ```sh
 dsh --profile web
 ```
 
+这不需要、也不要再去编辑 `cordis.patch.yml`：第二条 id 为 `commandcode` 的条目属于
+重复的 loader 条目 id，会导致启动失败。该文件在所有 bundle 层**之后**应用，因此它仍然
+是退出或微调该插件的地方：
+
+```yaml
+- id: commandcode
+  disabled: true
+```
+
 ### 验证
 
-`commandcode` 应出现在组装树的末尾：
+`commandcode` 应出现在组装树的末尾，且 profile 的 patch 层保持原样：
 
 ```sh
 dsh --profile web --dump-config | grep -A1 commandcode
+```
+
+### 从 0.1.0 升级
+
+0.1.0 不是 bundle，必须手工挂载：把上面的 `insert` 条目粘贴进 profile 的
+`cordis.patch.yml`。该条目与 bundle 自带的 insert 会成为两条 id 同为 `commandcode`
+的条目，启动会失败。更新到 0.1.1 及以后时，请把该文件恢复为 profile 模板自带的空数组：
+
+```yaml
+[]
 ```
 
 ### 更新
