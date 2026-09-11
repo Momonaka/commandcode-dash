@@ -42,15 +42,20 @@ const renderer = createRenderer()
 const mod = await loadClientBundle({ react: renderer.react })
 // `fresh` models a machine where the plugin was just installed and nothing has
 // been written to llm-pi-ai yet — the case that used to leave the user with no
-// models at all. `write-fails` starts from the same empty state.
+// models at all. `write-fails` starts from the same empty state. `migrate` models
+// an install provisioned by a version that never wrote the route-level modality
+// default: the routes and their catalogs exist, so only that field is owed.
+const legacy = scenario === 'migrate'
+const routeInput = legacy ? {} : { defaultInput: ['text', 'image'] }
 const configuredProviders =
   scenario === 'fresh' || scenario === 'write-fails'
     ? {}
     : {
-        commandcode: { displayName: 'Command Code', models: configured },
+        commandcode: { displayName: 'Command Code', ...routeInput, models: configured },
         // In sync with the catalog, so the run has exactly one thing to report.
         'commandcode-anthropic': {
           displayName: 'Command Code (Claude)',
+          ...routeInput,
           models: [{ id: 'claude-opus-5', name: 'Claude Opus 5', contextWindow: 1000000 }],
         },
       }
@@ -77,7 +82,7 @@ const tree = await renderer.render(Section, {})
 const view = renderer.walk(tree)
 const [accountResponse, modelsResponse] = [fetched[0], fetched[1]]
 
-const hasPanel = scenario === 'ok' || scenario === 'fresh' || scenario === 'write-fails'
+const hasPanel = scenario === 'ok' || scenario === 'fresh' || scenario === 'write-fails' || scenario === 'migrate'
 const rows = view.byClass['ccx-row'] ?? 0
 const claudeRows = view.texts.filter((t) => t.startsWith('claude-'))
 const nonClaudeLive = catalog.filter((model) => !model.id.startsWith('claude-')).length
@@ -143,6 +148,27 @@ if (scenario === 'ok') {
   check.ok('the failure is surfaced instead of passing silently', view.texts.some((t) => t.includes('Could not add the model provider')))
   check.ok('a retry action is offered', view.texts.includes('Try again'))
   check.same('the table stays empty when the write was refused', rows, 0)
+} else if (scenario === 'migrate') {
+  check.same('an existing install is topped up exactly once', mounted.writes.length, 1)
+  const ops = (mounted.writes[0] && mounted.writes[0].ops) || []
+  check.same(
+    'only the modality default is written, never the catalog',
+    ops.map((op) => `${op.op} ${op.path.join('.')}`).sort(),
+    ['set providers.commandcode-anthropic.defaultInput', 'set providers.commandcode.defaultInput'],
+  )
+  check.same(
+    'the top-up names both modalities on both routes',
+    ops.map((op) => op.value),
+    [['text', 'image'], ['text', 'image']],
+  )
+  check.same('the top-up is fenced by the namespace revision', mounted.writes[0] && mounted.writes[0].revision, 3)
+  check.ok(
+    'the silent top-up raises no notice of its own',
+    !view.texts.some((t) => t.includes('model provider') || t.includes('image input')),
+  )
+  check.same('the existing catalog is left in place', rows, configured.length + 1 + 1)
+  check.ok('the catalog diff from the same run is still offered', view.texts.some((t) => t.includes('Apply')))
+  check.same('the top-up does not trigger a second write', mounted.writes.length, 1)
 } else {
   check.same('no model table is rendered', rows, 0)
   check.same('the models route is not fetched without a usable key', fetched.length, 1)

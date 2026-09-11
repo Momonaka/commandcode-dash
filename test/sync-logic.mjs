@@ -100,6 +100,11 @@ check.same('no claude id lands on the OpenAI route', built.commandcode.models.fi
 check.same('only claude ids land on the Claude route', built['commandcode-anthropic'].models.filter((m) => !m.id.startsWith('claude-')).length, 0)
 check.ok('every provisioned model carries a context window', built.commandcode.models.every((m) => typeof m.contextWindow === 'number'))
 check.same('provisioned models declare no modality', built.commandcode.models.filter((m) => m.input !== undefined).length, 0)
+check.same(
+  'both routes declare the modality default instead',
+  [built.commandcode.defaultInput, built['commandcode-anthropic'].defaultInput],
+  [['text', 'image'], ['text', 'image']],
+)
 check.same('only the completions route sets the usage switch', [Boolean(built.commandcode.compat), Boolean(built['commandcode-anthropic'].compat)], [true, false])
 
 // --- optional: the real llm-pi-ai schema ---------------------------------
