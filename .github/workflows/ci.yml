@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Lets the first run be started from the Actions tab, so the badge is not
+  # empty until the next commit.
+  workflow_dispatch:
 
 permissions:
   contents: read
