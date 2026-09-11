@@ -6,5 +6,5 @@
 # (The monorepo's `verify-translation-pairing` script lives with that workspace
 # and does not travel with this out-of-tree plugin, so the hashes are recorded
 # by hand here.)
-README.md: defaba9a32e72aa3b1dfc90acc72dcf0144da36f
-README.zh.md: bf0f34f2ec54652fe567afe1344a446bd75199d9
+README.md: 10264d94445ca4fe78453a44d360ef1ddd487fda
+README.zh.md: 2e0ef492c0597d96af90742a5688030b17b2e5d1

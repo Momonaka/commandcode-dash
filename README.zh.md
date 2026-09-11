@@ -48,9 +48,19 @@ Web 插件，在设置面板中新增 **Command Code** 分区，让你不用离�
 
 ### 从 GitHub 安装
 
+`dsh plugin` 内部调用的是 **pnpm**，而原版 Node 安装并不自带它。先启用 Node 自带的
+corepack shim，再安装：
+
 ```sh
+corepack enable pnpm
 dsh plugin --profile web add github:Momonaka/commandcode-dash
 ```
+
+没有 pnpm 时，该命令会以 `dsh: pnpm not found on PATH` 停下。若不想启用 pnpm，
+可用下方的本地检出方式 —— 本插件没有依赖，一个软链就够了。
+
+安装过程会打印一条 `declares no dsh.bundle` 警告。这是预期行为：本插件是通过
+下方的 patch 条目挂载的，而不是作为 profile 层。
 
 ### 从本地检出安装
 
@@ -67,7 +77,8 @@ ln -sfn ~/dsh-plugins/commandcode-dash \
 
 ### 挂载插件
 
-把条目加到 profile 的 patch 层
+profile 的 patch 层初始内容是一个空数组 `[]`。请**把那个 `[]` 替换掉**，而不是在
+它后面追加 —— 否则会产生非法 YAML，profile 将拒绝启动。文件位于
 `${DSH_HOME:-$HOME/.dsh}/profiles/web/cordis.patch.yml`：
 
 ```yaml

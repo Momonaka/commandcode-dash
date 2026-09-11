@@ -1,0 +1,110 @@
+name: Clean install
+
+# The end-to-end check for a machine that has never seen this plugin: a pristine
+# GitHub runner installs the harness from npm, installs the plugin from GitHub by
+# the published command, mounts it, boots the web profile, and exercises the
+# plugin's routes over the authenticated API.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    # Weekly, so an upstream DSH change cannot break the install unnoticed.
+    - cron: '0 3 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  clean-install:
+    runs-on: ubuntu-latest
+    env:
+      DSH_HOME: ${{ runner.temp }}/dsh-home
+      PORT: '3097'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install the harness from npm
+        run: |
+          npm install -g @deepseek-ai/dsh
+          dsh --version || true
+
+      - name: Enable pnpm, which `dsh plugin` forwards to
+        run: |
+          corepack enable pnpm || sudo corepack enable pnpm
+          pnpm --version
+
+      - name: Initialise a fresh profile
+        run: |
+          # First use auto-initialises the profile from the shipped templates.
+          dsh --profile web --dump-config > /dev/null
+          test -f "$DSH_HOME/profiles/web/cordis.patch.yml"
+          grep -q '^\[\]$' "$DSH_HOME/profiles/web/cordis.patch.yml" \
+            || { echo 'expected the fresh patch layer to be an empty array'; exit 1; }
+
+      - name: Install the plugin by the documented command
+        run: |
+          dsh plugin --profile web add "github:${{ github.repository }}#${{ github.sha }}"
+          test -e "$DSH_HOME/profiles/web/node_modules/commandcode-dash/package.json"
+
+      - name: Mount it in the profile patch layer
+        run: |
+          # The shipped file is `[]`; it must be replaced, not appended to.
+          cat > "$DSH_HOME/profiles/web/cordis.patch.yml" <<'YAML'
+          - insert:
+              - id: commandcode
+                name: commandcode-dash
+          YAML
+          dsh --profile web --dump-config | grep -A1 'id: commandcode'
+
+      - name: Boot the web profile and exercise the plugin
+        run: |
+          set -euo pipefail
+          dsh --profile web --port "$PORT" --no-open > server.log 2>&1 &
+          echo $! > server.pid
+
+          BASE="http://127.0.0.1:$PORT"
+          TOKEN=''
+          for _ in $(seq 1 60); do
+            TOKEN=$(grep -o 'token=[A-Za-z0-9_-]*' server.log | head -1 | cut -d= -f2 || true)
+            [ -n "$TOKEN" ] && break
+            sleep 1
+          done
+          if [ -z "$TOKEN" ]; then echo 'server never printed a token'; cat server.log; exit 1; fi
+          echo "booted with a launch token"
+
+          # The token is exchanged for the signed browser cookie once, at the root.
+          curl -sf -c jar -o /dev/null "$BASE/?token=$TOKEN"
+          curl -sf -b jar -o index.html "$BASE/"
+
+          echo '--- the client half is in the boot graph'
+          grep -q 'commandcode-dash/client.js' index.html
+
+          echo '--- both routes answer through the authenticated API'
+          for route in account models; do
+            code=$(curl -s -b jar -o "body-$route.json" -w '%{http_code}' "$BASE/api/commandcode/$route")
+            [ "$code" = '200' ] || { echo "$route returned $code"; exit 1; }
+            # A runner has no Command Code key, so the correct first-run answer
+            # is the setup card signal, not an error.
+            grep -q '"code":"NO_KEY"' "body-$route.json" \
+              || { echo "$route did not report NO_KEY"; cat "body-$route.json"; exit 1; }
+          done
+
+          echo '--- an unregistered path under the same prefix still 404s'
+          code=$(curl -s -b jar -o /dev/null -w '%{http_code}' "$BASE/api/commandcode/not-a-route")
+          [ "$code" = '404' ] || { echo "expected 404, got $code"; exit 1; }
+
+          echo 'clean install verified'
+
+      - name: Server log
+        if: always()
+        run: cat server.log || true
+
+      - name: Stop the server
+        if: always()
+        run: |
+          [ -f server.pid ] && kill "$(cat server.pid)" 2>/dev/null || true

@@ -50,9 +50,20 @@ answer two questions without leaving the GUI:
 
 ### From GitHub
 
+`dsh plugin` forwards to **pnpm**, which a stock Node install does not include. Enable
+the bundled corepack shim once, then install:
+
 ```sh
+corepack enable pnpm
 dsh plugin --profile web add github:Momonaka/commandcode-dash
 ```
+
+Without pnpm that command stops with `dsh: pnpm not found on PATH`. If you would
+rather not enable it, use the local-checkout path below — the plugin has no
+dependencies, so a symlink is enough.
+
+The install prints a `declares no dsh.bundle` warning. That is expected: the
+plugin is mounted by the patch entry below rather than as a profile layer.
 
 ### From a local checkout
 
@@ -69,7 +80,9 @@ The symlink is enough because the host half imports **nothing** — no
 
 ### Mount the plugin
 
-Add the entry to the profile's patch layer at
+The profile's patch layer ships as an empty array containing `[]`. **Replace that
+`[]`** with the entry below — leaving it in place and appending produces invalid
+YAML and the profile refuses to boot. The file lives at
 `${DSH_HOME:-$HOME/.dsh}/profiles/web/cordis.patch.yml`:
 
 ```yaml
