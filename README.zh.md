@@ -4,7 +4,7 @@
 
 > 在 DeepSeek Harness 的设置面板里，直接查看 Command Code 的 credits、用量窗口与模型目录。
 >
-> **非官方社区插件。** 与 DeepSeek 及 Command Code 均无隶属、背书或赞助关系。
+> **非官方社区插件。** 与 DeepSeek 及 Command Code 均无关系。
 
 [![CI](https://github.com/Momonaka/commandcode-dash/actions/workflows/ci.yml/badge.svg)](https://github.com/Momonaka/commandcode-dash/actions/workflows/ci.yml)
 [![DSH](https://img.shields.io/badge/DSH-web%20plugin-4c6ef5)](#)
@@ -13,12 +13,11 @@
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 一个 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（DSH）
-Web 插件，在设置面板中新增 **Command Code** 分区，让你不用离开界面就能回答两个问题：
+Web 插件，在设置面板中新增 **Command Code** 分区：
 
-- **还剩多少？** 套餐、credits 余额、5 小时与每周用量窗口（含实时重置倒计时），
+- 套餐类型、credits 余额、5 小时与每周用量窗口（含实时重置倒计时），
   以及本计费周期的统计。
-- **我能跑什么？** 已配置的模型目录与 `provider/v1/models` 实时目录的差异对比，
-  并可一键同步。
+- 已配置的模型目录与 `provider/v1/models` 实时目录的差异对比，并可一键同步。
 
 ## 功能特性
 
@@ -41,7 +40,6 @@ Web 插件，在设置面板中新增 **Command Code** 分区，让你不用离�
 
 - 一份可用 `web` profile 的 DSH 安装。
 - 一个有 Provider API 权限的 Command Code 套餐 —— **除 Go 之外的套餐都可以**。
-  上游返回 `upgrade_required` 时，插件会给出明确提示而非笼统报错。
 - 主机侧 Node 20+（插件用到了 `AbortSignal.any`）。
 
 ## 安装
@@ -52,93 +50,7 @@ Web 插件，在设置面板中新增 **Command Code** 分区，让你不用离�
 dsh plugin --profile web add commandcode-dash
 ```
 
-最短的路径，也是唯一带真实版本号的路径：该包发布在公共 npm registry 上，不经过
-git 解析，`dsh plugin update` 也像普通依赖那样按版本升级。
-
-`dsh plugin` 内部调用的是 **pnpm**，而原版 Node 安装并不自带它。先启用 Node 自带的
-corepack shim：
-
-```sh
-corepack enable pnpm
-```
-
-### 从 GitHub 安装
-
-```sh
-dsh plugin --profile web add github:Momonaka/commandcode-dash
-```
-
-不需要发布任何东西，但 pnpm 会把解析到的提交钉在 profile 的锁文件里，所以这条路
-必须靠下方的显式更新步骤才能前进；对于尚未同步的镜像源也无法使用。
-
-### 从本地检出安装
-
-```sh
-dsh plugin --profile web add "link:$HOME/dsh-plugins/commandcode-dash"
-```
-
-`link:` 让 profile 直接指向检出目录，因此下一次启动加载的就是你改过的代码，无需每次
-改动都重装。主机半**零 import** —— 不需要解析任何 `@deepseek-ai/*` 说明符，所以检出
-目录本身不需要构建，也不需要单独的安装步骤。
-
-### 自动挂载
-
-`commandcode-dash` 是一个 DSH **bundle**：`package.json` 里声明了
-`dsh.bundle.patch`，它指向的 patch 文件贡献了下面这一行：
-
-```yaml
-- insert:
-    - id: commandcode
-      name: commandcode-dash
-```
-
-`dsh plugin add`（以及 `update`）会按安装后的真实状态对账，发现该声明后把包追加进
-profile 的 `dsh.profile.bundles`，所以安装完只剩重启这一步：
-
-```sh
-dsh --profile web
-```
-
-这不需要、也不要再去编辑 `cordis.patch.yml`：第二条 id 为 `commandcode` 的条目属于
-重复的 loader 条目 id，会导致启动失败。该文件在所有 bundle 层**之后**应用，因此它仍然
-是退出或微调该插件的地方：
-
-```yaml
-- id: commandcode
-  disabled: true
-```
-
-### 验证
-
-`commandcode` 应出现在组装树的末尾，且 profile 的 patch 层保持原样：
-
-```sh
-dsh --profile web --dump-config | grep -A1 commandcode
-```
-
-### 从 0.1.0 升级
-
-0.1.0 不是 bundle，必须手工挂载：把上面的 `insert` 条目粘贴进 profile 的
-`cordis.patch.yml`。该条目与 bundle 自带的 insert 会成为两条 id 同为 `commandcode`
-的条目，启动会失败。更新到 0.1.1 及以后时，请把该文件恢复为 profile 模板自带的空数组：
-
-```yaml
-[]
-```
-
-### 更新
-
-```sh
-dsh plugin --profile web update commandcode-dash
-```
-
-走 npm 安装时，这就是升级到新版本的常规方式。走 git 安装时它**不是可选项**：
-pnpm 对 git 依赖只解析一次，并把解析到的提交钉在 profile 的锁文件里，因此重跑安装
-命令只会打印 `Lockfile is up to date, resolution step is skipped`，然后原样保留旧
-代码。
-
-两种方式更新后都需要重启 `dsh web`：浏览器半是在插件激活时被快照的，运行中的服务器会一直
-提供旧 bundle，直到重启。
+重启 `dsh web`
 
 ## 配置
 
@@ -165,26 +77,8 @@ refs:
 | `commandcode` | `openai-completions` | 除 Claude 外的全部模型 |
 | `commandcode-anthropic` | `anthropic-messages` | Claude —— Command Code 只在 `/messages` 上提供它们 |
 
-已存在的路由**绝不会被覆盖**，所以手工调过的条目（包括逐模型的
-`input: [text, image]` 声明）在升级后依然保留。新装进来的模型一律声明为纯文本，
-因为目录接口不返回模态信息；需要的话到「设置 → 模型」手工补上。
+## 声明
 
-## 免责声明
+这是一个**非官方、社区构建**的插件。它与 DeepSeek 及 Command Code 均无隶属、背书或赞助关系，也不属于这两者的任何产品。
 
-这是一个**非官方、社区构建**的插件。它与 DeepSeek 及 Command Code 均无隶属、
-背书或赞助关系，也不属于这两者的任何产品。「DeepSeek」「DeepSeek Harness」
-「Command Code」是各自所有者的商标，此处仅用于说明本插件与什么互操作。
-
-它使用**你自己的** API key 访问 Command Code 的 Provider API，走的是 Command
-Code CLI 自己那个用量界面所用的同一批接口。除此之外不向任何地方发送数据，除了
-harness 已经持有的凭据之外也不存储任何东西。
-
-那些接口属于该 CLI 的内部实现，而非公开的正式契约，因此可能随时变更 —— 围绕
-API 访问的套餐规则同样如此。一旦发生变更，本面板会报错而不是静默失败，修复则
-意味着更新本插件。请自行斟酌使用。
-
-## 许可证
-
-[MIT](LICENSE) © Momonaka
-
-本项目与 DeepSeek 及 Command Code 无隶属或背书关系。
+它使用**你自己的** API key 访问 Command Code 的 Provider API，走的是 Command Code CLI 自己那个用量界面所用的同一批接口。除此之外不向任何地方发送数据。
