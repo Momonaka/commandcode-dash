@@ -89,8 +89,13 @@ if (hasPanel) {
   ])
   check.ok('the account identity is rendered', view.texts.includes('ada'))
   check.ok('the plan tag is rendered', view.texts.includes('GOAT'))
-  check.ok('the credits section is rendered', view.texts.includes('Credits'))
-  check.ok('the monthly balance is rendered', view.texts.includes('68.46'))
+  check.ok('the balance section is rendered', view.texts.includes('Balance'))
+  check.ok('the monthly balance is rendered as dollars', view.texts.includes('$68.46'))
+  check.ok(
+    'no credit wording remains in the panel',
+    !view.texts.join(' ').toLowerCase().includes('credit'),
+  )
+  check.ok('the usage window caps are dollars', view.texts.some((t) => t.includes('$14')))
   check.ok('the usage window section is rendered', view.texts.includes('Usage windows'))
   check.ok('the billing-period section is rendered', view.texts.includes('This billing period'))
   check.ok('a reset countdown is rendered', view.texts.some((t) => t.includes('resets in') || t.includes('reset pending')))
@@ -105,7 +110,8 @@ if (scenario === 'ok') {
   check.same('every model is rendered, with no truncation', rows, configured.length + 1 + 1)
   check.ok('the newly added model is listed', view.texts.includes('moonshotai/Kimi-K3'))
   check.ok('a dropped model is still listed', view.texts.includes('xai/grok-4.5'))
-  check.ok('a vision entry shows its modality', view.texts.some((t) => t.includes('vision')))
+  check.ok('a context size is rendered', view.texts.some((t) => t.includes('1,048,576')))
+  check.same('the capability column is gone', view.byClass['ccx-caps'] ?? 0, 0)
   check.ok('a diff summary is offered', view.texts.some((t) => t.includes('Apply')))
   check.same('claude is listed only once, on the Anthropic route', claudeRows, ['claude-opus-5'])
   check.same('an already-configured install is never overwritten', mounted.writes.length, 0)
