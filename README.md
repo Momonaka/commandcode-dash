@@ -34,29 +34,9 @@ answer two questions without leaving the GUI:
 
 ## Preview
 
-```
-Settings      Command Code                            ⟳ Refresh
-────────      ────────────────────────────────────────────────
- General      Account
- Models       ada · Ada Lovelace
-▶Command      ada@example.com
- Code         [ GOAT ]  active: active  renews Oct 10, 2026
- Plugins
-              Credits
-              Monthly credits          68.46
-              Purchased credits         0.00
-              Free credits              0.00
+![The Command Code section: account, credit balances, and the 5-hour and weekly usage windows](docs/preview-account.png)
 
-              Usage windows
-              5-hour      0.02 / 14      resets in 2h 14m
-                          ▏                        0.1%
-              Weekly      1.54 / 35      resets in 6d 3h
-                          █▏                       4.4%
-
-              This billing period
-              Requests 580   Success 100%  Credits used 1.60
-              Tokens 76.6M   Tokens in 76.2M  Tokens out 0.41M
-```
+![The model catalog with its context windows and declared modalities](docs/preview-models.png)
 
 ## Requirements
 
