@@ -101,6 +101,20 @@ dsh --profile web
 dsh --profile web --dump-config | grep -A1 commandcode
 ```
 
+### 更新
+
+pnpm 对 git 依赖只解析一次，并把解析到的提交钉在 profile 的锁文件里，因此
+**安装命令不会更新已装的版本** —— 它会打印
+`Lockfile is up to date, resolution step is skipped`，然后原样保留旧代码。要更新得
+显式执行：
+
+```sh
+dsh plugin --profile web update commandcode-dash
+```
+
+更新后需要重启 `dsh web`：浏览器半是在插件激活时被快照的，运行中的服务器会一直
+提供旧 bundle，直到重启。
+
 ## 配置
 
 ### API key

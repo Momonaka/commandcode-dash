@@ -48,7 +48,11 @@ jobs:
 
       - name: Install the plugin by the documented command
         run: |
-          dsh plugin --profile web add "github:${{ github.repository }}#${{ github.sha }}"
+          # Deliberately the plain form: `github:owner/repo#<sha>` only resolves
+          # when that SHA is the tip of a remote ref, and pnpm otherwise fails
+          # with ERR_PNPM_PACKAGE_MANAGER_ADD_RESOLVE_GIT. On a push to main the
+          # default branch head IS the commit under test.
+          dsh plugin --profile web add "github:${{ github.repository }}"
           test -e "$DSH_HOME/profiles/web/node_modules/commandcode-dash/package.json"
 
       - name: Mount it in the profile patch layer

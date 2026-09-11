@@ -105,6 +105,20 @@ dsh --profile web
 dsh --profile web --dump-config | grep -A1 commandcode
 ```
 
+### Updating
+
+pnpm resolves a git dependency once and pins the resolved commit in the profile's
+lockfile, so **the install command will not update an existing install** — it
+reports `Lockfile is up to date, resolution step is skipped` and leaves the old
+code in place. Update explicitly:
+
+```sh
+dsh plugin --profile web update commandcode-dash
+```
+
+Restart `dsh web` afterwards: the browser half is snapshotted when the plugin
+activates, so a running server keeps serving the old bundle until it restarts.
+
 ## Configuration
 
 ### The API key
