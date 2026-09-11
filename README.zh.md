@@ -33,9 +33,9 @@ Web 插件，在设置面板中新增 **Command Code** 分区，让你不用离�
 
 ## 界面预览
 
-![Command Code 分区：账号、credits 余额，以及 5 小时与每周用量窗口](docs/preview-account.png)
+![Command Code 分区：账号、credits 余额，以及 5 小时与每周用量窗口](https://raw.githubusercontent.com/Momonaka/commandcode-dash/main/docs/preview-account.png)
 
-![模型目录，含上下文窗口与已声明的模态](docs/preview-models.png)
+![模型目录，含上下文窗口与已声明的模态](https://raw.githubusercontent.com/Momonaka/commandcode-dash/main/docs/preview-models.png)
 
 ## 环境要求
 
@@ -46,21 +46,33 @@ Web 插件，在设置面板中新增 **Command Code** 分区，让你不用离�
 
 ## 安装
 
-### 从 GitHub 安装
+### 从 npm 安装
+
+```sh
+dsh plugin --profile web add commandcode-dash
+```
+
+最短的路径，也是唯一带真实版本号的路径：该包发布在公共 npm registry 上，不经过
+git 解析，`dsh plugin update` 也像普通依赖那样按版本升级。
 
 `dsh plugin` 内部调用的是 **pnpm**，而原版 Node 安装并不自带它。先启用 Node 自带的
-corepack shim，再安装：
+corepack shim：
 
 ```sh
 corepack enable pnpm
+```
+
+### 从 GitHub 安装
+
+```sh
 dsh plugin --profile web add github:Momonaka/commandcode-dash
 ```
 
-没有 pnpm 时，该命令会以 `dsh: pnpm not found on PATH` 停下。若不想启用 pnpm，
-可用下方的本地检出方式 —— 本插件没有依赖，一个软链就够了。
+不需要发布任何东西，但 pnpm 会把解析到的提交钉在 profile 的锁文件里，所以这条路
+必须靠下方的显式更新步骤才能前进；对于尚未同步的镜像源也无法使用。
 
-安装过程会打印一条 `declares no dsh.bundle` 警告。这是预期行为：本插件是通过
-下方的 patch 条目挂载的，而不是作为 profile 层。
+两种方式安装时都会打印一条 `declares no dsh.bundle` 警告。这是预期行为：本插件是
+通过下方的 patch 条目挂载的，而不是作为 profile 层。
 
 ### 从本地检出安装
 
@@ -103,16 +115,16 @@ dsh --profile web --dump-config | grep -A1 commandcode
 
 ### 更新
 
-pnpm 对 git 依赖只解析一次，并把解析到的提交钉在 profile 的锁文件里，因此
-**安装命令不会更新已装的版本** —— 它会打印
-`Lockfile is up to date, resolution step is skipped`，然后原样保留旧代码。要更新得
-显式执行：
-
 ```sh
 dsh plugin --profile web update commandcode-dash
 ```
 
-更新后需要重启 `dsh web`：浏览器半是在插件激活时被快照的，运行中的服务器会一直
+走 npm 安装时，这就是升级到新版本的常规方式。走 git 安装时它**不是可选项**：
+pnpm 对 git 依赖只解析一次，并把解析到的提交钉在 profile 的锁文件里，因此重跑安装
+命令只会打印 `Lockfile is up to date, resolution step is skipped`，然后原样保留旧
+代码。
+
+两种方式更新后都需要重启 `dsh web`：浏览器半是在插件激活时被快照的，运行中的服务器会一直
 提供旧 bundle，直到重启。
 
 ## 配置

@@ -34,9 +34,9 @@ answer two questions without leaving the GUI:
 
 ## Preview
 
-![The Command Code section: account, credit balances, and the 5-hour and weekly usage windows](docs/preview-account.png)
+![The Command Code section: account, credit balances, and the 5-hour and weekly usage windows](https://raw.githubusercontent.com/Momonaka/commandcode-dash/main/docs/preview-account.png)
 
-![The model catalog with its context windows and declared modalities](docs/preview-models.png)
+![The model catalog with its context windows and declared modalities](https://raw.githubusercontent.com/Momonaka/commandcode-dash/main/docs/preview-models.png)
 
 ## Requirements
 
@@ -48,22 +48,36 @@ answer two questions without leaving the GUI:
 
 ## Installation
 
-### From GitHub
+### From npm
 
-`dsh plugin` forwards to **pnpm**, which a stock Node install does not include. Enable
-the bundled corepack shim once, then install:
+```sh
+dsh plugin --profile web add commandcode-dash
+```
+
+The shortest path, and the only one with real version numbers: the package is
+published to the public npm registry, so nothing is resolved through git and
+`dsh plugin update` upgrades by version like any other dependency.
+
+`dsh plugin` forwards to **pnpm**, which a stock Node install does not include.
+Enable the bundled corepack shim once first:
 
 ```sh
 corepack enable pnpm
+```
+
+### From GitHub
+
+```sh
 dsh plugin --profile web add github:Momonaka/commandcode-dash
 ```
 
-Without pnpm that command stops with `dsh: pnpm not found on PATH`. If you would
-rather not enable it, use the local-checkout path below — the plugin has no
-dependencies, so a symlink is enough.
+Works without publishing anything, but pnpm pins the resolved commit in the
+profile lockfile, so this path needs the explicit update step below to move
+forward. It also cannot be used from a registry mirror that has not synced.
 
-The install prints a `declares no dsh.bundle` warning. That is expected: the
-plugin is mounted by the patch entry below rather than as a profile layer.
+Either way, the install prints a `declares no dsh.bundle` warning. That is
+expected: the plugin is mounted by the patch entry below rather than as a profile
+layer.
 
 ### From a local checkout
 
@@ -107,17 +121,19 @@ dsh --profile web --dump-config | grep -A1 commandcode
 
 ### Updating
 
-pnpm resolves a git dependency once and pins the resolved commit in the profile's
-lockfile, so **the install command will not update an existing install** — it
-reports `Lockfile is up to date, resolution step is skipped` and leaves the old
-code in place. Update explicitly:
-
 ```sh
 dsh plugin --profile web update commandcode-dash
 ```
 
-Restart `dsh web` afterwards: the browser half is snapshotted when the plugin
-activates, so a running server keeps serving the old bundle until it restarts.
+For an npm install that is the ordinary way to move to a new version. For a git
+install it is **not optional**: pnpm resolves a git dependency once and pins the
+resolved commit in the profile's lockfile, so re-running the install command
+reports `Lockfile is up to date, resolution step is skipped` and leaves the old
+code in place.
+
+Restart `dsh web` afterwards either way: the browser half is snapshotted when the
+plugin activates, so a running server keeps serving the old bundle until it
+restarts.
 
 ## Configuration
 
