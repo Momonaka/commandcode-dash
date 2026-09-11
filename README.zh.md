@@ -26,7 +26,7 @@ Web 插件，在设置面板中新增 **Command Code** 分区：
 | **Credits** | 来自实时计费接口的月度、购买与赠送 credits 余额。 |
 | **用量窗口** | 5 小时与每周窗口，显示 `used / cap`（已用 / 上限）、进度条，以及会自行走动的 `resets in …` 倒计时（不重新请求）。 |
 | **计费周期** | 请求数、成功率、消耗 credits 与 Token 总量。 |
-| **模型目录** | 列出每个已配置模型及其上下文窗口与模态，支持搜索。 |
+| **模型目录** | 列出每个已配置模型及其上下文窗口，支持搜索。 |
 | **目录同步** | 对比实时目录与你的配置，然后在你确认后执行新增、补齐上下文窗口与移除。 |
 | **引导卡片** | 未配置 key 时，该分区会变成一个表单，以只写方式保存 key。 |
 
@@ -34,7 +34,7 @@ Web 插件，在设置面板中新增 **Command Code** 分区：
 
 ![Command Code 分区：账号、credits 余额，以及 5 小时与每周用量窗口](https://raw.githubusercontent.com/Momonaka/commandcode-dash/main/docs/preview-account.png)
 
-![模型目录，含上下文窗口与已声明的模态](https://raw.githubusercontent.com/Momonaka/commandcode-dash/main/docs/preview-models.png)
+![模型目录，含上下文窗口](https://raw.githubusercontent.com/Momonaka/commandcode-dash/main/docs/preview-models.png)
 
 ## 环境要求
 

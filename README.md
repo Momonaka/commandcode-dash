@@ -27,7 +27,7 @@ plugin that adds a **Command Code** section to the settings panel:
 | **Credits** | Monthly, purchased, and free credit balances from the live billing API. |
 | **Usage windows** | 5-hour and weekly windows as `used / cap` with progress bars and `resets in …` countdowns that tick without refetching. |
 | **Billing period** | Requests, success rate, credits consumed, and token totals. |
-| **Model catalog** | Every configured model with context window and modality, searchable. |
+| **Model catalog** | Every configured model with its context window, searchable. |
 | **Catalog sync** | Diffs the live catalog against your config, then applies additions, context-window fills, and removals — each on your say-so. |
 | **Setup card** | When no key is configured, the section becomes a form that stores one write-only. |
 
@@ -35,7 +35,7 @@ plugin that adds a **Command Code** section to the settings panel:
 
 ![The Command Code section: account, credit balances, and the 5-hour and weekly usage windows](https://raw.githubusercontent.com/Momonaka/commandcode-dash/main/docs/preview-account.png)
 
-![The model catalog with its context windows and declared modalities](https://raw.githubusercontent.com/Momonaka/commandcode-dash/main/docs/preview-models.png)
+![The model catalog with its context windows](https://raw.githubusercontent.com/Momonaka/commandcode-dash/main/docs/preview-models.png)
 
 ## Requirements
 
