@@ -30,6 +30,7 @@ plugin that adds a **Command Code** section to the settings panel:
 | **Model catalog** | Every configured model with its context window, searchable. |
 | **Catalog sync** | Diffs the live catalog against your config, then applies additions, context-window fills, and removals — each on your say-so. |
 | **Setup card** | When no key is configured, the section becomes a form that stores one write-only. |
+| **Load once** | The section loads on your first visit and renders that same answer on later visits; the ⟳ buttons reload it on demand. |
 
 ## Preview
 

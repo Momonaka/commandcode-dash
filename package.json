@@ -39,7 +39,7 @@
     }
   },
   "scripts": {
-    "test": "node test/manifest.mjs && node test/sync-logic.mjs && node test/render.mjs && SCENARIO=fresh node test/render.mjs && SCENARIO=write-fails node test/render.mjs && SCENARIO=migrate node test/render.mjs && SCENARIO=no-key node test/render.mjs && SCENARIO=auth node test/render.mjs",
+    "test": "node test/manifest.mjs && node test/sync-logic.mjs && node test/render.mjs && SCENARIO=fresh node test/render.mjs && SCENARIO=write-fails node test/render.mjs && SCENARIO=migrate node test/render.mjs && SCENARIO=no-key node test/render.mjs && SCENARIO=auth node test/render.mjs && node test/remount.mjs && SCENARIO=error node test/remount.mjs",
     "test:live": "node test/host-routes.mjs"
   },
   "files": [

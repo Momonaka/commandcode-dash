@@ -21,10 +21,10 @@ function depsEqual(a, b) {
 /**
  * Create one isolated renderer instance.
  *
- * @returns `{ react, evaluate, render, walk, pendingEffects }`.
+ * @returns `{ react, evaluate, render, walk, reset, reactHooksPending }`.
  */
 export function createRenderer() {
-  const hooks = []
+  let hooks = []
   let cursor = 0
   let pending = []
   let dirty = false
@@ -145,5 +145,20 @@ export function createRenderer() {
     return acc
   }
 
-  return { react, evaluate, render, walk, reactHooksPending: () => pending.length }
+  /**
+   * Drop every hook slot so the next `render` is a fresh mount.
+   *
+   * A React component that stays registered while the user navigates away and
+   * back is unmounted and remounted with empty hook state; the module closure
+   * around it — and anything it memoizes there — survives. This reproduces that
+   * split, which is exactly what a cache that must outlive one mount depends on.
+   */
+  function reset() {
+    hooks = []
+    cursor = 0
+    pending = []
+    dirty = false
+  }
+
+  return { react, evaluate, render, walk, reset, reactHooksPending: () => pending.length }
 }
