@@ -12,6 +12,20 @@
 import { createRenderer } from './fake-react.mjs'
 import { check, fixture, loadClientBundle, mountClient } from './helpers.mjs'
 
+/** The first element of one tag name in an evaluated tree. */
+function byTag(node, tag) {
+  if (node === null || node === undefined || typeof node !== 'object') return undefined
+  if (Array.isArray(node)) {
+    for (const child of node) {
+      const found = byTag(child, tag)
+      if (found !== undefined) return found
+    }
+    return undefined
+  }
+  if (node.type === tag) return node
+  return byTag(node.props && node.props.children, tag)
+}
+
 const account = fixture('account')
 const configured = fixture('configured')
 const catalog = fixture('catalog').data.map((model) => ({
@@ -68,7 +82,28 @@ const mounted = mountClient(mod, {
 console.log(`render (${scenario})`)
 check.same('the bundle registers exactly one settings section', mounted.registrations.map((r) => r.id), ['command-code'])
 check.same('the section sits after Models in the nav', mounted.registrations.map((r) => r.order), [10])
-check.same('the nav label is the product name', mounted.registrations.map((r) => r.label), ['Command Code'])
+// The shell draws its nav glyph from the section id and falls back to a gear for
+// an id it does not know, and the slot carries no icon option — so the plugin's
+// glyph rides inside the label, which is the one seat the shell renders verbatim.
+const navRow = renderer.walk(mounted.registrations[0].label)
+check.same('the nav label is the product name', navRow.texts, ['Command Code'])
+check.same('the nav label carries the plugin glyph', navRow.byClass['ccx-navIcon'] ?? 0, 1)
+check.same(
+  'the glyph is the only thing in the row before the name',
+  navRow.tags.filter((tag) => tag === 'svg').length,
+  1,
+)
+// Swapping the artwork means editing path data and the viewBox together; pinning
+// both is what stops a half-done swap from shipping an invisible or clipped mark.
+const glyph = byTag(mounted.registrations[0].label, 'svg')
+const glyphStart = byTag(glyph, 'path')
+check.same('the glyph keeps its source coordinate system', glyph.props.viewBox, '0 0 1066 1024')
+check.ok('the glyph carries real geometry', String(glyphStart.props.d).length > 200)
+check.same('the glyph follows the nav text colour', glyphStart.props.fill, 'currentColor')
+check.ok(
+  'the shell fallback glyph is retired beside it',
+  /button:has\(\.ccx-navItem\)>svg\{display:none\}/.test(String(mounted.head[0].textContent)),
+)
 check.same('it binds the llm-pi-ai namespace for the model list', mounted.binds.map((b) => b.namespace), ['llm-pi-ai'])
 check.ok('the stylesheet is injected once', mounted.styleBytes > 500)
 
@@ -106,6 +141,10 @@ if (hasPanel) {
   check.ok('a reset countdown is rendered', view.texts.some((t) => t.includes('resets in') || t.includes('reset pending')))
   check.ok('the model panel is rendered', view.texts.includes('Models'))
   check.same('no "more" placeholder remains', view.byClass['ccx-more'] ?? 0, 0)
+  // One actions cluster, on the account header: the account's refresh already
+  // reloads both routes, so the models header no longer duplicates it.
+  check.same('the model header offers no refresh of its own', view.byClass['ccx-colActions'] ?? 0, 1)
+  check.same('and the panel offers exactly one refresh control', view.texts.filter((t) => t.includes('Refresh')).length, 1)
 }
 
 // --- automatic provider provisioning -------------------------------------

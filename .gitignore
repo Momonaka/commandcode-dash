@@ -6,3 +6,6 @@ node_modules/
 
 # Logs and scratch output
 *.log
+
+# Agent working notes: kept in the checkout, never part of the published repo.
+AGENT.md

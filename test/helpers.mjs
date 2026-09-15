@@ -51,7 +51,7 @@ export async function loadClientBundle(stubs) {
  * @param options - `{ section }` is the resolved `llm-pi-ai` section handed to a
  *   bound scope; `{ credentials }` the credentials face; `{ revision }` the
  *   scope revision.
- * @returns `{ section, registrations, binds, styleBytes, ctx, head }`.
+ * @returns `{ section, registrations, binds, styleBytes, ctx, head, credentialCalls, windowListeners }`.
  */
 export function mountClient(mod, options = {}) {
   const registered = []
@@ -67,7 +67,38 @@ export function mountClient(mod, options = {}) {
     observe() {}
     disconnect() {}
   }
+  // The bundle also listens on `window` (the sign-out confirmation takes Escape
+  // in the capture phase). Keep every registration, with its phase, so a test can
+  // fire one and see that the cleanup left nothing behind.
+  const windowListeners = []
+  const fakeWindow = globalThis.window ?? {}
+  globalThis.window = fakeWindow
+  fakeWindow.addEventListener = (type, fn, capture) => {
+    windowListeners.push({ type, fn, capture: capture === true })
+  }
+  fakeWindow.removeEventListener = (type, fn) => {
+    const at = windowListeners.findIndex((entry) => entry.type === type && entry.fn === fn)
+    if (at >= 0) windowListeners.splice(at, 1)
+  }
   const writes = []
+  // Every credential-store write the panel asks for, in order, so a test can
+  // assert that signing out really forgot the reference instead of only
+  // repainting. A caller-supplied face still runs underneath the recording.
+  const credentialCalls = []
+  const credentialFace = options.credentials ?? {
+    set: async () => {},
+    unset: async () => {},
+  }
+  const credentials = {
+    set: (ref, value) => {
+      credentialCalls.push({ op: 'set', ref, value })
+      return credentialFace.set(ref, value)
+    },
+    unset: (ref) => {
+      credentialCalls.push({ op: 'unset', ref })
+      return credentialFace.unset(ref)
+    },
+  }
   // The fake scope folds writes back into its snapshot and notifies subscribers,
   // the way the real settings service does — otherwise a test could never see
   // the panel react to its own provisioning write.
@@ -118,7 +149,7 @@ export function mountClient(mod, options = {}) {
             },
           }
         : service === 'remote'
-          ? { credentials: options.credentials ?? { set: async () => {} } }
+          ? { credentials }
           : undefined,
     slots: {
       inject: (_slot, fn) => fn(),
@@ -139,6 +170,8 @@ export function mountClient(mod, options = {}) {
     registrations: registered,
     binds,
     writes,
+    credentialCalls,
+    windowListeners,
     styleBytes: head[0] ? String(head[0].textContent).length : 0,
     ctx,
     head,

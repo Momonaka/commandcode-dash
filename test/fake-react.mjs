@@ -3,7 +3,7 @@
  *
  * The plugin bundle is a lazy-CJS factory that `require`s React; handing it this
  * module instead makes the real component tree renderable without a browser,
- * jsdom, or a React install. Hooks are implemented in call order — the same
+ * jsdom, or a React install. Hooks are stored per component function — the same
  * contract React relies on — and function components are evaluated depth-first
  * inside the render pass.
  *
@@ -24,10 +24,54 @@ function depsEqual(a, b) {
  * @returns `{ react, evaluate, render, walk, reset, reactHooksPending }`.
  */
 export function createRenderer() {
-  let hooks = []
+  /** Hook slots of the component being evaluated, and its cursor. */
+  let slots = []
   let cursor = 0
+  /**
+   * Hook slots, one store per component function.
+   *
+   * React arrives at the same place by keying hooks to the mounted instance; a
+   * single call-order array is not enough here because a component can be
+   * skipped on an intermediate pass and rendered later — `ModelsPanel` waits for
+   * a second fetch, while a control after it appears at once — and it would then
+   * read the slots that control had already claimed.
+   *
+   * Keyed by function identity, so the same component mounted twice would share
+   * state. Nothing here does that; a react-alike that did would need a
+   * per-instance key rather than this one.
+   */
+  const stores = new Map()
   let pending = []
+  /** Effect cleanups owed before the next batch of effects runs. */
+  let cleanups = []
+  /** Stores rendered in this pass, and in the one before it. */
+  let rendered = new Set()
+  let previous = new Set()
   let dirty = false
+
+  /** @returns the persistent hook store for one component. */
+  function storeFor(type) {
+    let store = stores.get(type)
+    if (store === undefined) {
+      store = []
+      stores.set(type, store)
+    }
+    return store
+  }
+
+  /**
+   * Retire one component's hooks the way unmounting does: hand over whatever its
+   * effects returned, and forget the slots so a remount starts from empty.
+   *
+   * @param store - the component's hook slots.
+   */
+  function unmount(store) {
+    for (const slot of store) {
+      if (slot === undefined || typeof slot.cleanup !== 'function') continue
+      cleanups.push(slot.cleanup)
+      slot.cleanup = undefined
+    }
+  }
 
   const react = {
     createElement: (type, props, ...children) => ({
@@ -36,8 +80,8 @@ export function createRenderer() {
     }),
     useState: (init) => {
       const i = cursor++
-      if (hooks[i] === undefined) hooks[i] = { value: typeof init === 'function' ? init() : init }
-      const slot = hooks[i]
+      if (slots[i] === undefined) slots[i] = { value: typeof init === 'function' ? init() : init }
+      const slot = slots[i]
       return [
         slot.value,
         (next) => {
@@ -51,26 +95,34 @@ export function createRenderer() {
     },
     useRef: (init) => {
       const i = cursor++
-      if (hooks[i] === undefined) hooks[i] = { current: init }
-      return hooks[i]
+      if (slots[i] === undefined) slots[i] = { current: init }
+      return slots[i]
     },
     useCallback: (fn, deps) => {
       const i = cursor++
-      const prev = hooks[i]
-      if (prev === undefined || deps === undefined || !depsEqual(prev.deps, deps)) hooks[i] = { fn, deps }
-      return hooks[i].fn
+      const prev = slots[i]
+      if (prev === undefined || deps === undefined || !depsEqual(prev.deps, deps)) slots[i] = { fn, deps }
+      return slots[i].fn
     },
     useMemo: (fn, deps) => {
       const i = cursor++
-      const prev = hooks[i]
-      if (prev === undefined || deps === undefined || !depsEqual(prev.deps, deps)) hooks[i] = { value: fn(), deps }
-      return hooks[i].value
+      const prev = slots[i]
+      if (prev === undefined || deps === undefined || !depsEqual(prev.deps, deps)) slots[i] = { value: fn(), deps }
+      return slots[i].value
     },
     useEffect: (fn, deps) => {
       const i = cursor++
-      const prev = hooks[i]
-      if (prev === undefined || deps === undefined || !depsEqual(prev.deps, deps)) pending.push(fn)
-      hooks[i] = { deps }
+      const store = slots
+      const prev = store[i]
+      if (prev !== undefined && deps !== undefined && depsEqual(prev.deps, deps)) return
+      // A re-run cleans up the previous run first, and an unmount runs it last;
+      // either way the cleanup is owed before the effect that replaces it.
+      if (prev !== undefined && typeof prev.cleanup === 'function') cleanups.push(prev.cleanup)
+      const slot = { deps, cleanup: undefined }
+      store[i] = slot
+      pending.push(() => {
+        slot.cleanup = fn()
+      })
     },
     useLayoutEffect: () => {
       throw new Error('fake-react: useLayoutEffect is not implemented')
@@ -85,7 +137,21 @@ export function createRenderer() {
     if (node === null || node === undefined || typeof node === 'boolean') return null
     if (Array.isArray(node)) return node.map(evaluate)
     if (typeof node === 'string' || typeof node === 'number') return node
-    if (typeof node.type === 'function') return evaluate(node.type(node.props))
+    if (typeof node.type === 'function') {
+      // Swap in this component's own slots for the duration of its call, then
+      // hand the cursor back before recursing, so nesting neither leaks nor
+      // loses a slot. The component reads all of its hooks before any child is
+      // evaluated, which is what makes the swap safe.
+      const outer = slots
+      const outerCursor = cursor
+      slots = storeFor(node.type)
+      rendered.add(slots)
+      cursor = 0
+      const renderedTree = node.type(node.props)
+      slots = outer
+      cursor = outerCursor
+      return evaluate(renderedTree)
+    }
     return { type: node.type, props: { ...node.props, children: evaluate(node.props.children) } }
   }
 
@@ -103,9 +169,21 @@ export function createRenderer() {
     let tree
     let passes = 0
     for (; passes < maxPasses; passes++) {
-      cursor = 0
       dirty = false
-      tree = evaluate(component(props))
+      rendered = new Set()
+      tree = evaluate({ type: component, props })
+      // A component rendered on the previous pass and not on this one is gone.
+      // React runs its effect cleanups and drops its state there, so a later
+      // remount starts from empty rather than inheriting what it left behind.
+      for (const [type, store] of [...stores]) {
+        if (!previous.has(store) || rendered.has(store)) continue
+        unmount(store)
+        if (stores.get(type) === store) stores.delete(type)
+      }
+      previous = rendered
+      const owed = cleanups
+      cleanups = []
+      for (const fn of owed) fn()
       const queued = pending
       pending = []
       for (const fn of queued) fn()
@@ -154,10 +232,17 @@ export function createRenderer() {
    * split, which is exactly what a cache that must outlive one mount depends on.
    */
   function reset() {
-    hooks = []
+    for (const store of stores.values()) unmount(store)
+    stores.clear()
+    slots = []
     cursor = 0
     pending = []
     dirty = false
+    rendered = new Set()
+    previous = new Set()
+    const owed = cleanups
+    cleanups = []
+    for (const fn of owed) fn()
   }
 
   return { react, evaluate, render, walk, reset, reactHooksPending: () => pending.length }

@@ -30,7 +30,8 @@ plugin that adds a **Command Code** section to the settings panel:
 | **Model catalog** | Every configured model with its context window, searchable. |
 | **Catalog sync** | Diffs the live catalog against your config, then applies additions, context-window fills, and removals — each on your say-so. |
 | **Setup card** | When no key is configured, the section becomes a form that stores one write-only. |
-| **Load once** | The section loads on your first visit and renders that same answer on later visits; the ⟳ buttons reload it on demand. |
+| **Sign out** | A text button at the bottom of the section opens a confirmation dialog, then forgets the stored key and puts the section back on the setup card. |
+| **Load once** | The section loads on your first visit and renders that same answer on later visits; the account header's ⟳ reloads both routes on demand. |
 
 ## Preview
 
@@ -69,7 +70,10 @@ refs:
 ```
 
 It is resolved host-side once per request, so saving one takes effect on the next
-refresh — no restart.
+refresh — no restart. **Sign out** at the bottom of the section asks for
+confirmation, then forgets the stored key and returns the section to the setup
+card; the `llm-pi-ai` routes it created are left in place, since they are
+configuration you also edit by hand.
 
 ### The model provider
 
