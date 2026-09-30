@@ -40,7 +40,7 @@ Web 插件，在设置面板中新增 **Command Code** 分区：
 
 ## 环境要求
 
-- 一份可用 `web` profile 的 DSH 安装。
+- 一份可用 `web` profile 的 DSH 安装，或桌面端 App。
 - 一个有 Provider API 权限的 Command Code 套餐 —— **除 Go 之外的套餐都可以**。
 - 主机侧 Node 20+（插件用到了 `AbortSignal.any`）。
 
@@ -53,6 +53,16 @@ dsh plugin --profile web add commandcode-dash
 ```
 
 重启 `dsh web`
+
+### 在桌面端安装
+
+插件->添加插件->输入包名：
+
+```
+commandcode-dash
+```
+
+重启桌面端
 
 ## 配置
 

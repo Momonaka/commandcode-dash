@@ -41,7 +41,7 @@ plugin that adds a **Command Code** section to the settings panel:
 
 ## Requirements
 
-- A DSH install with the `web` profile available.
+- A DSH install with the `web` profile available, or the desktop app.
 - A Command Code plan with Provider API access — **every plan except Go**.
 - Node 20+ on the host (the plugin uses `AbortSignal.any`).
 
@@ -54,6 +54,16 @@ dsh plugin --profile web add commandcode-dash
 ```
 
 Restart `dsh web`.
+
+### On the desktop app
+
+Open **Plugins → Add plugin** and enter the package name:
+
+```
+commandcode-dash
+```
+
+Restart the desktop app.
 
 ## Configuration
 
