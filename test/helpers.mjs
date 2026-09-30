@@ -50,7 +50,9 @@ export async function loadClientBundle(stubs) {
  * @param mod - exports from {@link loadClientBundle}.
  * @param options - `{ section }` is the resolved `llm-pi-ai` section handed to a
  *   bound scope; `{ credentials }` the credentials face; `{ revision }` the
- *   scope revision.
+ *   scope revision; `{ settings }` which settings service this shell generation
+ *   serves — `'settingsScope'` (0.1.x, the default), `'configForms'` (0.2.x), or
+ *   `'none'` for a composition that serves neither.
  * @returns `{ section, registrations, binds, styleBytes, ctx, head, credentialCalls, windowListeners }`.
  */
 export function mountClient(mod, options = {}) {
@@ -105,52 +107,47 @@ export function mountClient(mod, options = {}) {
   let sectionValue = options.section ?? {}
   let sectionRevision = options.revision ?? 1
   const listeners = []
-  const ctx = {
-    get: (service) =>
-      service === 'settingsScope'
-        ? {
-            bind: (spec) => {
-              binds.push(spec)
-              return {
-                getSnapshot: () => ({
-                  status: 'ready',
-                  // A fresh object per read, like the real mirror: the contract is
-                  // "stable reference until the next change", so a change must
-                  // produce a new identity or identity-keyed consumers go stale.
-                  value: structuredClone(sectionValue),
-                  revision: sectionRevision,
-                  writable: options.writable ?? true,
-                }),
-                subscribe: (fn) => {
-                  listeners.push(fn)
-                  return () => {
-                    const at = listeners.indexOf(fn)
-                    if (at >= 0) listeners.splice(at, 1)
-                  }
-                },
-                // Records every auto-provisioning attempt so a test can assert it.
-                mutate: (ops, revision) => {
-                  writes.push({ ops, revision })
-                  if (options.writeFails === true) return Promise.reject(new Error('settings refused the write'))
-                  for (const op of ops) {
-                    if (op.op !== 'set') continue
-                    let node = sectionValue
-                    for (const key of op.path.slice(0, -1)) {
-                      if (typeof node[key] !== 'object' || node[key] === null) node[key] = {}
-                      node = node[key]
-                    }
-                    node[op.path[op.path.length - 1]] = op.value
-                  }
-                  sectionRevision += 1
-                  for (const fn of [...listeners]) fn()
-                  return Promise.resolve()
-                },
-              }
-            },
-          }
-        : service === 'remote'
-          ? { credentials }
-          : undefined,
+  const scope = () => ({
+    getSnapshot: () => ({
+      status: 'ready',
+      // A fresh object per read, like the real mirror: the contract is
+      // "stable reference until the next change", so a change must
+      // produce a new identity or identity-keyed consumers go stale.
+      value: structuredClone(sectionValue),
+      revision: sectionRevision,
+      writable: options.writable ?? true,
+    }),
+    subscribe: (fn) => {
+      listeners.push(fn)
+      return () => {
+        const at = listeners.indexOf(fn)
+        if (at >= 0) listeners.splice(at, 1)
+      }
+    },
+    // Records every auto-provisioning attempt so a test can assert it.
+    mutate: (ops, revision) => {
+      writes.push({ ops, revision })
+      if (options.writeFails === true) return Promise.reject(new Error('settings refused the write'))
+      for (const op of ops) {
+        if (op.op !== 'set') continue
+        let node = sectionValue
+        for (const key of op.path.slice(0, -1)) {
+          if (typeof node[key] !== 'object' || node[key] === null) node[key] = {}
+          node = node[key]
+        }
+        node[op.path[op.path.length - 1]] = op.value
+      }
+      sectionRevision += 1
+      for (const fn of [...listeners]) fn()
+      return Promise.resolve()
+    },
+  })
+  // One settings service per shell generation, each with only the face that
+  // generation actually has: 0.1.x exposed a binder (`bind`), 0.2.x exposes a
+  // per-entry reader (`get`). A fake that answered both would hide exactly the
+  // bug this models — the panel hard-wiring one name.
+  const services = {
+    remote: { credentials },
     slots: {
       inject: (_slot, fn) => fn(),
       register: (slotOptions, Component) => {
@@ -163,6 +160,41 @@ export function mountClient(mod, options = {}) {
         return () => {}
       },
     },
+  }
+  const generation = options.settings ?? 'settingsScope'
+  if (generation === 'configForms') {
+    services.configForms = {
+      get: (namespace) => {
+        binds.push({ namespace })
+        // The real service hands back one controller per entry and caches it;
+        // repeated reads must be the same object, or the panel's subscription
+        // and its writes would land on two different controllers.
+        return (services.configForms.forms[namespace] ??= scope())
+      },
+      forms: {},
+    }
+  } else if (generation === 'settingsScope') {
+    services.settingsScope = {
+      bind: (spec) => {
+        binds.push(spec)
+        return scope()
+      },
+    }
+  }
+  const ctx = {
+    get: (service) => services[service],
+    // `ctx.inject(deps, callback)` starts a child fiber once every named service
+    // exists; a missing one leaves it pending forever. The panel leans on that
+    // to ride whichever generation this shell serves, so the fake has to be just
+    // as literal: no callback when the service is absent.
+    inject: (deps, callback) => {
+      if (!deps.every((dep) => services[dep] !== undefined)) return undefined
+      const child = Object.create(ctx)
+      for (const dep of deps) child[dep] = services[dep]
+      callback(child)
+      return undefined
+    },
+    slots: services.slots,
   }
   mod.apply(ctx)
   return {
